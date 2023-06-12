@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use crate::AppState;
+use crate::error::GarbageError;
 use crate::utils::dir_size;
 
 #[derive(Eq, PartialEq, Hash, Debug)]
@@ -35,13 +36,13 @@ pub struct GarbageRecognizerResult {
     pub deletable: Vec<PathBuf>,
 }
 
-pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<GarbageRecognizerResult>, String> {
+pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
     let mut ignored_subdirectories = HashSet::<PathBuf>::new();
     let mut result = Vec::<GarbageRecognizerResult>::new();
 
     for entry in WalkDir::new(path).follow_links(false) {
-        let entry = entry.unwrap();
-        let meta = entry.metadata().unwrap();
+        let entry = entry?;
+        let meta = entry.metadata()?;
         let path = entry.path();
 
         if meta.is_file() {
@@ -71,7 +72,7 @@ pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<Ga
                 };
                 let deletable_content_path = path.join(file_type_path);
                 if deletable_content_path.exists() {
-                    directory_size = dir_size(&deletable_content_path).unwrap();
+                    directory_size = dir_size(&deletable_content_path).unwrap_or_default();
                     ignored_subdirectories.insert(deletable_content_path.clone());
                     deletable_files.push(deletable_content_path.clone());
                     true
