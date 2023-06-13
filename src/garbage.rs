@@ -97,3 +97,6 @@ pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<Ga
     Ok(results)
 }
 
+pub fn compute_deletable_size_from_garbage_results(results: &Vec<GarbageRecognizerResult>) -> u64 {
+    results.iter().map(|entry| &entry.size).sum()
+}
