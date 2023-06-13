@@ -38,18 +38,18 @@ pub struct GarbageRecognizerResult {
 
 pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
     let mut ignored_subdirectories = HashSet::<PathBuf>::new();
-    let mut result = Vec::<GarbageRecognizerResult>::new();
+    let mut results = Vec::<GarbageRecognizerResult>::new();
 
     for entry in WalkDir::new(path).follow_links(false) {
         let entry = entry?;
-        let meta = entry.metadata()?;
-        let path = entry.path();
+        let metadata = entry.metadata()?;
+        let entry_path = entry.path();
 
-        if meta.is_file() {
+        if metadata.is_file() {
             continue;
         }
 
-        if ignored_subdirectories.iter().any(|ignored_subdirectory| path.starts_with(ignored_subdirectory)) {
+        if ignored_subdirectories.iter().any(|ignored_subdirectory| entry_path.starts_with(ignored_subdirectory)) {
             continue;
         }
 
@@ -62,7 +62,8 @@ pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<Ga
                     FileType::File(value) => value,
                     FileType::Directory(value) => value,
                 };
-                Path::new(&path.join(file_type_path)).exists()
+                let file_path = entry_path.join(file_type_path);
+                file_path.exists()
             });
 
             let contains_deletable_content = recognizer.delete.iter().any(|recognition| {
@@ -70,7 +71,7 @@ pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<Ga
                     FileType::File(value) => value,
                     FileType::Directory(value) => value,
                 };
-                let deletable_content_path = path.join(file_type_path);
+                let deletable_content_path = entry_path.join(file_type_path);
                 if deletable_content_path.exists() {
                     directory_size = dir_size(&deletable_content_path).unwrap_or_default();
                     ignored_subdirectories.insert(deletable_content_path.clone());
@@ -82,16 +83,17 @@ pub fn find_garbage_in_directory(path: &Path, state: &AppState) -> Result<Vec<Ga
             });
 
             if contains_recognitions && contains_deletable_content {
-                result.push(GarbageRecognizerResult {
+                let garbage_result = GarbageRecognizerResult {
                     ident: recognizer.ident.clone(),
-                    directory: path.to_path_buf(),
+                    directory: entry_path.to_path_buf(),
                     size: directory_size,
                     deletable: deletable_files,
-                })
+                };
+                results.push(garbage_result);
             }
         }
     }
 
-    Ok(result)
+    Ok(results)
 }
 
