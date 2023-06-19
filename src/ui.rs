@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::str::Chars;
 
 pub struct BuildContext {
@@ -52,17 +53,10 @@ impl UIBox<'_> {
     }
 
     pub fn render(self) {
-        let content = &self.content;
-        let content_chars = content.chars();
-
         let computed_width = self.computed_width();
-        let computed_height = {
-            let mut chars = content_chars.take_while(|c| c == &'\n').count();
-            self.computed_height() + chars
-        };
 
         self.render_header(computed_width);
-        self.render_content(computed_width, computed_height);
+        self.render_content(computed_width);
         self.render_footer(computed_width);
     }
 
@@ -70,19 +64,19 @@ impl UIBox<'_> {
         self.render_horizontal(computed_width, '┌', '┐', '─', self.title.as_ref());
     }
 
-    fn render_content(&self, computed_width: usize, computed_height: usize) {
+    fn render_content(&self, computed_width: usize) {
         let mut chars = &mut self.content.chars();
         let mut line_char_count = 0;
 
         fn fill_whitespace_and_close(line_char_count: usize, computed_width: usize) {
             let remaining_length = computed_width - line_char_count - 2;
-            for x in 0..remaining_length {
+            for _ in 0..remaining_length {
                 print!(" ");
             }
             println!("│");
         }
 
-        for (index, ch) in chars.enumerate() {
+        for ch in chars {
             if line_char_count == 0 {
                 print!("│");
             }
@@ -141,15 +135,5 @@ impl UIBox<'_> {
         };
 
         width
-    }
-
-    pub fn computed_height(&self) -> usize {
-        let original = (self.content.len() as f64 / self.computed_width() as f64).ceil() as usize;
-        let height = match self.context.size {
-            Some(size) => size.height.unwrap_or(original),
-            None => original,
-        };
-
-        height
     }
 }
