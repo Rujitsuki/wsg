@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use crate::AppState;
 use crate::error::GarbageError;
@@ -28,7 +29,7 @@ pub enum FileType {
     Directory(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GarbageRecognizerResult {
     pub ident: String,
     pub directory: PathBuf,
