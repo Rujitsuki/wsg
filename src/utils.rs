@@ -35,7 +35,7 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{:.2} {}", value, units[unit_index])
 }
 
-pub fn cache_garbage_result_vec(from_path: &PathBuf, list: &Vec<GarbageRecognizerResult>) -> Result<PathBuf, Box<dyn Error>> {
+pub fn cache_garbage_result_vec(from_path: &Path, list: &Vec<GarbageRecognizerResult>) -> Result<PathBuf, Box<dyn Error>> {
     let path_hash = generate_base64_from_path(&from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
