@@ -1,5 +1,4 @@
 use std::collections::hash_map::DefaultHasher;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
@@ -7,8 +6,9 @@ use std::io::{Read, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use crate::garbage::{GarbageRecognizer, GarbageRecognizerResult};
+use crate::garbage::GarbageRecognizerResult;
 use base64::{Engine as _, engine::general_purpose};
+use crate::error::GarbageError;
 
 pub fn dir_size(path: impl Into<PathBuf>) -> std::io::Result<u64> {
     let mut dir: fs::ReadDir = fs::read_dir(path.into())?;
@@ -35,7 +35,7 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{:.2} {}", value, units[unit_index])
 }
 
-pub fn write_garbage_result_vec_cache(from_path: &Path, result_list: &Vec<GarbageRecognizerResult>) -> Result<PathBuf, Box<dyn Error>> {
+pub fn write_garbage_result_vec_cache(from_path: &Path, result_list: &Vec<GarbageRecognizerResult>) -> Result<PathBuf, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
@@ -64,7 +64,7 @@ pub fn write_garbage_result_vec_cache(from_path: &Path, result_list: &Vec<Garbag
     Ok(cache_file_path)
 }
 
-pub fn read_garbage_result_vec_cache(from_path: &Path) -> Result<Vec<GarbageRecognizerResult>, Box<dyn Error>> {
+pub fn read_garbage_result_vec_cache(from_path: &Path) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
