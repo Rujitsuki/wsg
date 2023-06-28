@@ -1,3 +1,6 @@
+use crate::error::GarbageError;
+use crate::garbage::GarbageRecognizerResult;
+use base64::{engine::general_purpose, Engine as _};
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::fs::File;
@@ -6,9 +9,7 @@ use std::io::{Read, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use crate::garbage::GarbageRecognizerResult;
-use base64::{Engine as _, engine::general_purpose};
-use crate::error::GarbageError;
+use walkdir::WalkDir;
 
 pub fn dir_size(path: impl Into<PathBuf>) -> std::io::Result<u64> {
     let mut dir: fs::ReadDir = fs::read_dir(path.into())?;
@@ -35,7 +36,10 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{:.2} {}", value, units[unit_index])
 }
 
-pub fn write_garbage_result_vec_cache(from_path: &Path, result_list: &Vec<GarbageRecognizerResult>) -> Result<PathBuf, GarbageError> {
+pub fn write_garbage_result_vec_cache(
+    from_path: &Path,
+    result_list: &Vec<GarbageRecognizerResult>,
+) -> Result<PathBuf, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
@@ -64,17 +68,49 @@ pub fn write_garbage_result_vec_cache(from_path: &Path, result_list: &Vec<Garbag
     Ok(cache_file_path)
 }
 
-pub fn read_garbage_result_vec_cache(from_path: &Path) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
+pub fn read_garbage_result_vec_cache(
+    from_path: &Path,
+) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
 
     let mut file = File::open(&cache_file_path)?;
-    let mut json_string= String::new();
+    let mut json_string = String::new();
     file.read_to_string(&mut json_string)?;
 
     let result_list: Vec<GarbageRecognizerResult> = serde_json::from_str(&json_string)?;
     Ok(result_list)
+}
+
+pub fn delete_garbage_result_vec_cache(from_path: &Path) -> Result<(), GarbageError> {
+    let path_hash = generate_base64_from_path(from_path);
+    let cache_dir_path = std::env::temp_dir().join("wsg/");
+    let cache_file_path = cache_dir_path.join(path_hash);
+
+    if !cache_file_path.exists() || !cache_file_path.is_file() {
+        let error = std::io::Error::from(std::io::ErrorKind::NotFound);
+        return Err(GarbageError::IOError(error));
+    }
+
+    fs::remove_file(cache_file_path)?;
+    Ok(())
+}
+
+pub fn delete_all_cache_files() -> Result<(), GarbageError> {
+    let cache_dir_path = std::env::temp_dir().join("wsg/");
+    for entry in WalkDir::new(cache_dir_path)
+        .follow_links(false)
+        .max_depth(1)
+    {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if metadata.is_file() {
+            fs::remove_file(entry.path())?;
+        }
+    }
+
+    Ok(())
 }
 
 fn generate_base64_from_path(p: &Path) -> String {
