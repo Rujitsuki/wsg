@@ -27,13 +27,15 @@ impl From<serde_json::Error> for GarbageError {
 
 pub enum ApplicationError {
     MissingArgumentPath,
+    InvalidArgumentPath,
     IdNotExists(String),
 }
 
 impl Display for ApplicationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            ApplicationError::MissingArgumentPath => write!(f, "A valid path must be specified"),
+            ApplicationError::MissingArgumentPath => write!(f, "A path must be specified"),
+            ApplicationError::InvalidArgumentPath => write!(f, "It must be a valid path"),
             ApplicationError::IdNotExists(id) => write!(f, "The id {} does not exists, please check if the id exists with --list", id),
         }
     }
