@@ -4,7 +4,10 @@ use crate::garbage::{
     find_garbage_in_directory, FileType, GarbageIndex, GarbageRecognizer, GarbageRecognizerResult,
 };
 use crate::ui::{BuildContext, Size, UIBox};
-use crate::utils::{format_bytes, read_garbage_result_vec_cache, write_garbage_result_vec_cache};
+use crate::utils::{
+    delete_garbage_result_vec_cache, format_bytes, read_garbage_result_vec_cache,
+    write_garbage_result_vec_cache,
+};
 use clap::Parser;
 use std::collections::HashSet;
 use std::env;
@@ -149,6 +152,7 @@ fn arg_clean(path: &Path, ids: &Vec<GarbageIndex>) -> Result<(), GarbageError> {
 
     if confirmation {
         clean_garbage_from_vec(filtered_garbage)?;
+        delete_garbage_result_vec_cache(path)?;
         println!("The garbage has been deleted successfully!");
     }
 
