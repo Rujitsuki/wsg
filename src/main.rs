@@ -5,8 +5,8 @@ use crate::garbage::{
 };
 use crate::ui::{BuildContext, Size, UIBox};
 use crate::utils::{
-    delete_garbage_result_vec_cache, format_bytes, read_garbage_result_vec_cache,
-    write_garbage_result_vec_cache,
+    delete_all_cache_files, delete_garbage_result_vec_cache, format_bytes,
+    read_garbage_result_vec_cache, write_garbage_result_vec_cache,
 };
 use clap::Parser;
 use std::collections::HashSet;
@@ -53,6 +53,12 @@ struct Args {
 
     #[arg(long)]
     list_recognizer: bool,
+
+    #[arg(long, help = "Clean the application cache for all listings")]
+    clean_cache: bool,
+
+    #[arg(long, help = "Force to renew the cache for specific path")]
+    force: bool,
 }
 
 fn main() -> Result<(), ApplicationError> {
@@ -61,12 +67,10 @@ fn main() -> Result<(), ApplicationError> {
 
     register_garbage_recognizer(&mut state);
 
-    if args.path.is_some() && args.clean.is_none() && args.list == false {
-        let _path = match env::current_dir() {
-            Err(_) => Err(ApplicationError::InvalidArgumentPath),
-            Ok(path) => Ok(path),
-        }?;
-        let _ = arg_list(&state, &_path);
+    if args.clean_cache {
+        delete_all_cache_files()?;
+        println!("\nCache cleared successfully\n");
+        return Ok(());
     }
 
     if args.list {
@@ -74,7 +78,8 @@ fn main() -> Result<(), ApplicationError> {
             None => Err(ApplicationError::MissingArgumentPath),
             Some(path) => Ok(path),
         }?;
-        let _ = arg_list(&state, &_path);
+        let _ = arg_list(&state, &_path, args.force);
+        return Ok(());
     }
 
     if let Some(ids) = args.clean {
@@ -82,22 +87,39 @@ fn main() -> Result<(), ApplicationError> {
             None => Err(ApplicationError::MissingArgumentPath),
             Some(path) => Ok(path),
         }?;
-        if let Err(err) = arg_clean(&_path, &ids) {
-            let _ = arg_list(&state, _path);
-            println!("\nYou should first get an overview before you delete anything!\nThe --clean command can now be used.");
+        if let Err(_) = arg_clean(&_path, &ids) {
+            let _ = arg_list(&state, _path, true);
+            println!("\nYou should first get an overview before you delete anything!\nThe --clean command can now be used.\n");
         }
+        return Ok(());
+    }
+
+    if args.path.is_some() && args.clean.is_none() && args.list == false {
+        let _path = match args.path {
+            None => Err(ApplicationError::InvalidArgumentPath),
+            Some(path) => Ok(path),
+        }?;
+        let _ = arg_list(&state, &_path, args.force);
+        return Ok(());
     }
 
     Ok(())
 }
 
-fn arg_list(state: &AppState, path: &Path) -> Result<(), GarbageError> {
-    let result = match read_garbage_result_vec_cache(path, None) {
-        Ok(vec) => vec,
-        Err(_) => {
+fn arg_list(state: &AppState, path: &Path, force: bool) -> Result<(), GarbageError> {
+    let generate_garbage_result_without_cache =
+        || -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
             let garbage = find_garbage_in_directory(path, state)?;
             let _ = write_garbage_result_vec_cache(path, &garbage, None)?;
-            garbage
+            Ok(garbage)
+        };
+
+    let result = if force {
+        generate_garbage_result_without_cache()?
+    } else {
+        match read_garbage_result_vec_cache(path, None) {
+            Ok(vec) => vec,
+            Err(_) => generate_garbage_result_without_cache()?,
         }
     };
 
