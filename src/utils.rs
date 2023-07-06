@@ -134,3 +134,155 @@ fn generate_base64_from_path(p: &Path) -> String {
     };
     general_purpose::STANDARD_NO_PAD.encode(&bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::garbage::{GarbageIndex, GarbageRecognizerResult};
+    use crate::utils::{
+        delete_garbage_result_vec_cache, dir_size, format_bytes, generate_base64_from_path,
+        is_cache_durable, read_garbage_result_vec_cache, write_garbage_result_vec_cache,
+    };
+    use std::env::temp_dir;
+    use std::fs;
+    use std::fs::File;
+    use std::io::Write;
+    use std::ops::{Add, Sub};
+    use std::path::{Path, PathBuf};
+    use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn test_dir_size() {
+        let temp_dir = temp_dir().join("wsg_dev");
+        fs::create_dir_all(&temp_dir).expect("Failed to create temporary wsg_dev directory");
+
+        let file01 = &temp_dir.join("01");
+        let file02 = &temp_dir.join("02");
+
+        File::create(file01)
+            .expect("Failed to create test file")
+            .write_all(vec![0; 1_000_000].as_slice())
+            .expect("Can't write test bytes to file");
+        File::create(file02)
+            .expect("Failed to create test file")
+            .write_all(vec![0; 1_500_000].as_slice())
+            .expect("Can't write test bytes to file");
+
+        let result = dir_size(&temp_dir);
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+        assert_eq!(result, 2_500_000);
+
+        fs::remove_dir_all(&temp_dir).expect("Can't delete wsg_dev directory");
+    }
+
+    #[test]
+    fn test_format_bytes() {
+        let test_cases = [
+            (0, "0.00 B"),
+            (100, "100.00 B"),
+            (1000, "1.00 kB"),
+            (1000_00, "100.00 kB"),
+            (1000_000, "1.00 MB"),
+            (1000_000_00, "100.00 MB"),
+            (1000_000_000, "1.00 GB"),
+            (1000_000_000_00, "100.00 GB"),
+            (1000_000_000_000, "1.00 TB"),
+            (1000_000_000_000_00, "100.00 TB"),
+            (1000_000_000_000_000, "1.00 PB"),
+            (1000_000_000_000_000_00, "100.00 PB"),
+            (1000_000_000_000_000_000, "1.00 EB"),
+            (1000_000_000_000_000_000_0, "10.00 EB"),
+        ];
+
+        for (input, expected_output) in test_cases {
+            let output = format_bytes(input);
+            assert_eq!(output, expected_output);
+        }
+    }
+
+    #[test]
+    fn test_garbage_result_vec_cache() {
+        let path = Path::new("/Users/testuser/Projects");
+        let garbage_results = vec![
+            GarbageRecognizerResult {
+                index: GarbageIndex::Id(0),
+                recognizer_name: "Rust".to_string(),
+                directory: Default::default(),
+                size: 0,
+                deletable: vec![],
+            },
+            GarbageRecognizerResult {
+                index: GarbageIndex::Id(1),
+                recognizer_name: "Flutter".to_string(),
+                directory: PathBuf::from("/Users/testuser/Projects/example"),
+                size: 0,
+                deletable: vec![PathBuf::from("/Users/testuser/Projects/example/target")],
+            },
+        ];
+
+        let write_result = write_garbage_result_vec_cache(path, &garbage_results, None);
+        assert!(write_result.is_ok());
+
+        let read_result = read_garbage_result_vec_cache(path, None);
+        assert!(write_result.is_ok());
+    }
+
+    #[test]
+    fn test_is_cache_durable() {
+        assert_eq!(
+            is_cache_durable(SystemTime::now().add(Duration::from_secs(5))),
+            true
+        );
+        assert_eq!(
+            is_cache_durable(SystemTime::now().add(Duration::from_secs(10))),
+            true
+        );
+        assert_eq!(
+            is_cache_durable(SystemTime::now().sub(Duration::from_secs(5))),
+            false
+        );
+        assert_eq!(
+            is_cache_durable(SystemTime::now().sub(Duration::from_secs(10))),
+            false
+        );
+    }
+
+    #[test]
+    fn test_delete_garbage_result_vec_cache() {
+        let temp_dir = temp_dir().join("wsg");
+        fs::create_dir_all(&temp_dir).expect("Failed to create temporary wsg_dev directory");
+
+        let base64_file_name = generate_base64_from_path(Path::new("/Users/testuser/Projects"));
+        let test_file_path = temp_dir.join(base64_file_name);
+        fs::File::create(test_file_path).expect("Failed to create test file");
+
+        let result = delete_garbage_result_vec_cache(Path::new("/Users/testuser/Projects"));
+
+        assert!(result.is_ok());
+
+        fs::remove_dir_all(&temp_dir).expect("Can't delete wsg_dev directory");
+    }
+
+    #[test]
+    fn test_generate_base64_from_path() {
+        assert_eq!(
+            generate_base64_from_path(Path::new("/Users/testuser/Projects"),),
+            "HU+HKWhsmqU"
+        );
+        assert_eq!(
+            generate_base64_from_path(Path::new("/Users/testuser/Projects/"),),
+            "HU+HKWhsmqU"
+        );
+        assert_eq!(
+            generate_base64_from_path(Path::new("C:/Users/TestUser/Projects"),),
+            "9sOUzqnWnG0"
+        );
+        assert_eq!(
+            generate_base64_from_path(Path::new("C:/Users/TestUser/Projects/"),),
+            "9sOUzqnWnG0"
+        );
+        assert_eq!(generate_base64_from_path(Path::new(""),), "vWCstljHnkU");
+        assert_eq!(generate_base64_from_path(Path::new("/"),), "vWCstljHnkU");
+    }
+}
