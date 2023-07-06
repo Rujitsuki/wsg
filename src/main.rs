@@ -52,7 +52,7 @@ struct Args {
     #[arg(long, value_name="RECOGNIZER", value_delimiter=',', num_args = 1.., help = "Start with all available recognizers, only the elected are excluded.")]
     exclude_recognizer: Option<Vec<String>>,
 
-    #[arg(long)]
+    #[arg(long, help = "List all available recognizers")]
     list_recognizer: bool,
 
     #[arg(long, help = "Clean the application cache for all listings")]
@@ -72,6 +72,11 @@ fn main() -> Result<(), ApplicationError> {
         delete_all_cache_files()?;
         println!("\nCache cleared successfully\n");
         return Ok(());
+    }
+
+    if args.list_recognizer {
+        arg_list_recognizer(&state);
+        return Ok(())
     }
 
     if args.list {
@@ -199,6 +204,14 @@ fn display_garbage_to_clean(results: &Vec<GarbageRecognizerResult>) {
         println!();
     });
     println!();
+}
+
+fn arg_list_recognizer(state: &AppState) {
+    println!("All available garbage recognizers\n");
+    for recognizer in &state.garbage_recognizer {
+        println!("• {}", recognizer.name);
+    }
+    println!("\nBy default all are selected. Use --include-recognizer or --exclude-recognizer to adjust the selection");
 }
 
 fn register_garbage_recognizer(state: &mut AppState, args: &Args) {
