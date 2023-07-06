@@ -13,6 +13,11 @@ pub fn available_recognizer() -> Vec<GarbageRecognizer> {
             Some(vec![FileType::Directory("node_modules".into())]),
         ),
         GarbageRecognizer::new(
+            "Composer",
+            Some(vec![FileType::File("composer.json".into())]),
+            Some(vec![FileType::Directory("vendor".into())]),
+        ),
+        GarbageRecognizer::new(
             "Rust",
             Some(vec![FileType::File("Cargo.toml".into())]),
             Some(vec![FileType::Directory("target".into())]),
