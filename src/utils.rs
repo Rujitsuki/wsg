@@ -39,6 +39,7 @@ pub fn format_bytes(bytes: u64) -> String {
 pub fn write_garbage_result_vec_cache(
     from_path: &Path,
     result_list: &Vec<GarbageRecognizerResult>,
+    cache_durability: Option<Duration>,
 ) -> Result<PathBuf, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
@@ -49,18 +50,16 @@ pub fn write_garbage_result_vec_cache(
     }
 
     if cache_file_path.exists() && cache_file_path.is_file() {
-        let metadata = cache_file_path.metadata()?;
-        let current_time = SystemTime::now();
-        let estimated_time = metadata.created()?.add(Duration::from_secs(60 * 5));
-        if current_time < estimated_time {
+        let estimated_time = cache_file_path
+            .metadata()?
+            .modified()?
+            .add(cache_durability.unwrap_or(Duration::from_secs(60 * 5)));
+
+        if is_cache_durable(estimated_time) {
             return Ok(cache_file_path);
         }
     }
 
-    // Generate HashFile
-    if cache_file_path.exists() {
-        fs::remove_file(&cache_file_path)?;
-    }
     let mut file = File::create(&cache_file_path)?;
     let json_string = serde_json::to_string_pretty(result_list)?;
     file.write_all(json_string.as_bytes())?;
@@ -70,17 +69,31 @@ pub fn write_garbage_result_vec_cache(
 
 pub fn read_garbage_result_vec_cache(
     from_path: &Path,
+    cache_durability: Option<Duration>,
 ) -> Result<Vec<GarbageRecognizerResult>, GarbageError> {
     let path_hash = generate_base64_from_path(from_path);
     let cache_dir_path = std::env::temp_dir().join("wsg/");
     let cache_file_path = cache_dir_path.join(path_hash);
 
     let mut file = File::open(&cache_file_path)?;
+    let estimated_time = file
+        .metadata()?
+        .modified()?
+        .add(cache_durability.unwrap_or(Duration::from_secs(60 * 5)));
+
+    if !is_cache_durable(estimated_time) {
+        return Err(GarbageError::InvalidCache);
+    }
+
     let mut json_string = String::new();
     file.read_to_string(&mut json_string)?;
 
     let result_list: Vec<GarbageRecognizerResult> = serde_json::from_str(&json_string)?;
     Ok(result_list)
+}
+
+fn is_cache_durable(estimated_time: SystemTime) -> bool {
+    SystemTime::now() < estimated_time
 }
 
 pub fn delete_garbage_result_vec_cache(from_path: &Path) -> Result<(), GarbageError> {

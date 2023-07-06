@@ -151,7 +151,7 @@ pub fn compute_deletable_size_from_garbage_results(results: &Vec<GarbageRecogniz
 pub fn clean_garbage_in_directory(
     path: &Path,
 ) -> Result<Vec<DeleteOperationSelection>, GarbageError> {
-    let result_list: Vec<GarbageRecognizerResult> = read_garbage_result_vec_cache(path).unwrap();
+    let result_list: Vec<GarbageRecognizerResult> = read_garbage_result_vec_cache(path, None)?;
     clean_garbage_from_vec(result_list)
 }
 

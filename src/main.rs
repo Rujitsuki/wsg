@@ -82,18 +82,21 @@ fn main() -> Result<(), ApplicationError> {
             None => Err(ApplicationError::MissingArgumentPath),
             Some(path) => Ok(path),
         }?;
-        arg_clean(&_path, &ids).unwrap();
+        if let Err(err) = arg_clean(&_path, &ids) {
+            let _ = arg_list(&state, _path);
+            println!("\nYou should first get an overview before you delete anything!\nThe --clean command can now be used.");
+        }
     }
 
     Ok(())
 }
 
 fn arg_list(state: &AppState, path: &Path) -> Result<(), GarbageError> {
-    let result = match read_garbage_result_vec_cache(path) {
+    let result = match read_garbage_result_vec_cache(path, None) {
         Ok(vec) => vec,
         Err(_) => {
             let garbage = find_garbage_in_directory(path, state)?;
-            let _ = write_garbage_result_vec_cache(path, &garbage)?;
+            let _ = write_garbage_result_vec_cache(path, &garbage, None)?;
             garbage
         }
     };
@@ -138,7 +141,7 @@ fn display_garbage_results(results: &Vec<GarbageRecognizerResult>) -> Result<(),
 }
 
 fn arg_clean(path: &Path, ids: &Vec<GarbageIndex>) -> Result<(), GarbageError> {
-    let garbage = read_garbage_result_vec_cache(path)?;
+    let garbage = read_garbage_result_vec_cache(path, None)?;
     let filtered_garbage = filter_garbage_from_ids(garbage, &ids);
 
     display_garbage_to_clean(&filtered_garbage);

@@ -5,6 +5,7 @@ pub enum GarbageError {
     IOError(std::io::Error),
     WalkdirError(walkdir::Error),
     SerializationError(serde_json::Error),
+    InvalidCache,
 }
 
 impl Display for GarbageError {
@@ -13,6 +14,7 @@ impl Display for GarbageError {
             GarbageError::IOError(error) => write!(f, "IOError: {}", error),
             GarbageError::WalkdirError(error) => write!(f, "Directory recursive error: {}", error),
             GarbageError::SerializationError(error) => write!(f, "Serialization error: {}", error),
+            GarbageError::InvalidCache => write!(f, "Invalid cache"),
         }
     }
 }
@@ -47,7 +49,11 @@ impl Display for ApplicationError {
         match &self {
             ApplicationError::MissingArgumentPath => write!(f, "A path must be specified"),
             ApplicationError::InvalidArgumentPath => write!(f, "It must be a valid path"),
-            ApplicationError::IdNotExists(id) => write!(f, "The id {} does not exists, please check if the id exists with --list", id),
+            ApplicationError::IdNotExists(id) => write!(
+                f,
+                "The id {} does not exists, please check if the id exists with --list",
+                id
+            ),
             ApplicationError::GarbageError(error) => write!(f, "{}", error),
         }
     }
