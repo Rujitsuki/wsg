@@ -1,8 +1,9 @@
 use crate::error::{ApplicationError, GarbageError};
 use crate::garbage::{
     clean_garbage_from_vec, compute_deletable_size_from_garbage_results, filter_garbage_from_ids,
-    find_garbage_in_directory, FileType, GarbageIndex, GarbageRecognizer, GarbageRecognizerResult,
+    find_garbage_in_directory, GarbageIndex, GarbageRecognizer, GarbageRecognizerResult,
 };
+use crate::recognizer::available_recognizer;
 use crate::ui::{BuildContext, Size, UIBox};
 use crate::utils::{
     delete_all_cache_files, delete_garbage_result_vec_cache, format_bytes,
@@ -10,11 +11,11 @@ use crate::utils::{
 };
 use clap::Parser;
 use std::collections::HashSet;
-use std::env;
 use std::path::{Path, PathBuf};
 
 mod error;
 mod garbage;
+mod recognizer;
 mod ui;
 mod utils;
 
@@ -45,10 +46,10 @@ struct Args {
     #[arg(short, long, value_delimiter = ',', num_args = 1.., value_name = "index", help = "Delete all the garbage in directory")]
     clean: Option<Vec<GarbageIndex>>,
 
-    #[arg(long, value_name="RECOGNIZER", value_delimiter=',', num_args = 1.., help = "")]
+    #[arg(long, value_name="RECOGNIZER", value_delimiter=',', num_args = 1.., help = "Start without any recognizer, only the selected ones are applied.")]
     include_recognizer: Option<Vec<String>>,
 
-    #[arg(long, value_name="RECOGNIZER", value_delimiter=',', num_args = 1..)]
+    #[arg(long, value_name="RECOGNIZER", value_delimiter=',', num_args = 1.., help = "Start with all available recognizers, only the elected are excluded.")]
     exclude_recognizer: Option<Vec<String>>,
 
     #[arg(long)]
@@ -65,7 +66,7 @@ fn main() -> Result<(), ApplicationError> {
     let mut state = AppState::new();
     let args = Args::parse();
 
-    register_garbage_recognizer(&mut state);
+    register_garbage_recognizer(&mut state, &args);
 
     if args.clean_cache {
         delete_all_cache_files()?;
@@ -200,20 +201,23 @@ fn display_garbage_to_clean(results: &Vec<GarbageRecognizerResult>) {
     println!();
 }
 
-fn register_garbage_recognizer(state: &mut AppState) {
-    state.register_garbage_recognizer(GarbageRecognizer::new(
-        "Flutter",
-        Some(vec![FileType::File("pubspec.yaml".into())]),
-        Some(vec![FileType::Directory("build".into())]),
-    ));
-    state.register_garbage_recognizer(GarbageRecognizer::new(
-        "NodeJS",
-        Some(vec![FileType::File("package.json".into())]),
-        Some(vec![FileType::Directory("node_modules".into())]),
-    ));
-    state.register_garbage_recognizer(GarbageRecognizer::new(
-        "Rust, Cargo",
-        Some(vec![FileType::File("Cargo.toml".into())]),
-        Some(vec![FileType::Directory("target".into())]),
-    ));
+fn register_garbage_recognizer(state: &mut AppState, args: &Args) {
+    let mut recognizer = available_recognizer();
+
+    include_recognizer(&mut recognizer, args);
+    exclude_recognizer(&mut recognizer, args);
+
+    state.garbage_recognizer.extend(recognizer);
+}
+
+fn include_recognizer(recognizer_vec: &mut Vec<GarbageRecognizer>, args: &Args) {
+    if let Some(include_recognizer) = &args.include_recognizer {
+        recognizer_vec.retain(|r| include_recognizer.contains(&r.name.to_lowercase()));
+    }
+}
+
+fn exclude_recognizer(recognizer_vec: &mut Vec<GarbageRecognizer>, args: &Args) {
+    if let Some(exclude_recognizer) = &args.exclude_recognizer {
+        recognizer_vec.retain(|r| !exclude_recognizer.contains(&r.name.to_lowercase()));
+    }
 }
